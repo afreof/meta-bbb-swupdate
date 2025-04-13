@@ -4,3 +4,6 @@
 [submodule "meta-openembedded"]
 	path = meta-openembedded
 	url = git://git.openembedded.org/meta-openembedded
+[submodule "meta-swupdate"]
+	path = meta-swupdate
+	url = https://github.com/sbabic/meta-swupdate.git
