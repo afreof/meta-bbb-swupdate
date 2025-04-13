@@ -1,0 +1,154 @@
+#!/bin/bash
+
+usage() {
+    echo "$0 <OEINIT> <BUILDDIR>"
+    echo "  OEINIT:   path to directory where the .vscode folder is"
+    echo "  BUILDDIR: directory passed to the oe-init-setup-env script"
+}
+
+if [ $# -lt 2 ]; then
+    usage
+    exit 1
+fi
+
+OEINIT=$(readlink -f "$1")
+BUILDDIR=$(readlink -f "$2")
+VSCODEDIR=$OEINIT/.vscode
+# consume OEINIT
+shift
+
+
+if [ ! -d "$OEINIT" ] || [ ! -d "$BUILDDIR" ]; then
+    echo "$OEINIT and/or $BUILDDIR directories are not present."
+    exit 1
+fi
+
+VSCODE_SETTINGS=$VSCODEDIR/settings.json
+mkdir -p "$VSCODEDIR"
+
+# Create de-duplicated list of canonical builddir paths
+# If multiple builddirs exist and are provided to the script via a wildcard
+# (e.g. projects/*), the BUILDDIR arg given to oe-init-build-env will stay the
+# first element in the list. This is useful because the VSCode extension picks
+# the first one by default.
+bdirs=()
+
+for arg in "$@"; do
+  canonical_path=$(realpath "$arg" 2>/dev/null)
+  found=0
+  for bdirs_path in "${bdirs[@]}"; do
+    if [[ $canonical_path == "$bdirs_path" ]]; then
+      found=1
+      break
+    fi
+  done
+
+  if [[ $found -eq 0 ]]; then
+    bdirs+=("$canonical_path")
+  fi
+done
+
+# Write the settings.json
+echo "{" > "$VSCODE_SETTINGS"
+
+echo '    "bitbake.buildConfigurations": [' >> "$VSCODE_SETTINGS"
+first_line=1
+for bdir in "${bdirs[@]}"; do
+    if [ -e "$bdir/conf/bblayers.conf" ]; then
+        if [ "$first_line" = "1" ]; then
+            first_line=0
+        else
+            echo "," >> "$VSCODE_SETTINGS"
+        fi
+        # Replace the $OEINIT part of the path by VSCode's ${workspaceFolder} variable.
+        ws_builddir="${bdir//$OEINIT/\$\{workspaceFolder\}}"
+        echo -n "        { \"name\": \"${bdir##*/}\", \"pathToBuildFolder\": \"$ws_builddir\" }" >> "$VSCODE_SETTINGS"
+    fi
+done
+echo '' >> "$VSCODE_SETTINGS"
+echo '    ],' >> "$VSCODE_SETTINGS"
+
+# Find the bitbake directory relative to this script's location.
+# Trimming away 'scripts/*' from the full path leaves us with the
+# meta-siemens folder where we will find poky/bitbake.
+bitbakedir=$(realpath "${BASH_SOURCE[0]%%scripts/*}poky/bitbake")
+ws_bitbakedir="${bitbakedir//$OEINIT/\$\{workspaceFolder\}}"
+
+cat <<EOMsettings >> "$VSCODE_SETTINGS"
+    "bitbake.pathToEnvScript": "\${workspaceFolder}/oe-init-build-env",
+    "bitbake.pathToBitbakeFolder": "${ws_bitbakedir}",
+    "bitbake.parseOnSave": false,
+    "git.detectSubmodulesLimit": 20,
+    "files.exclude": {
+        "**/_build/**": true,
+        "**/.git/**": true,
+        "**/bitbake-cookerdaemon.log": true,
+        "**/buildhistory/**": true,
+        "**/cache/**": true,
+        "**/CHANGELOG*.md": true,
+        "**/copyrights/**": true,
+        "**/docs-venv/**": true,
+        "**/downloads/**": true,
+        "**/node_modules/**": true,
+        "**/oe-logs/**": true,
+        "**/oe-workdir/**": true,
+        "**/sstate-cache/**": true,
+        "**/tmp*/**": true,
+        "**/workspace/attic/**": true,
+        "**/workspace/sources/**": true
+    },
+    "files.watcherExclude": {
+        "**/_build/**": true,
+        "**/.git/**": true,
+        "**/buildhistory/**": true,
+        "**/cache/**": true,
+        "**/CHANGELOG*.md": true,
+        "**/copyrights/**": true,
+        "**/docs-venv/**": true,
+        "**/downloads/**": true,
+        "**/node_modules/**": true,
+        "**/oe-logs/**": true,
+        "**/oe-workdir/**": true,
+        "**/sstate-cache/**": true,
+        "**/tmp*/**": true,
+        "**/workspace/attic/**": true,
+        "**/workspace/sources/**": true
+    },
+    "python.analysis.exclude": [
+        "**/_build/**",
+        "**/.git/**",
+        "**/buildhistory/**",
+        "**/cache/**",
+        "**/CHANGELOG*.md",
+        "**/copyrights/**",
+        "**/docs-venv/**",
+        "**/downloads/**",
+        "**/node_modules/**",
+        "**/oe-logs/**",
+        "**/oe-workdir/**",
+        "**/sstate-cache/**",
+        "**/tmp*/**",
+        "**/workspace/attic/**",
+        "**/workspace/sources/**"
+    ]
+}
+EOMsettings
+
+
+# Ask the user if the yocto-bitbake extension should be installed
+VSCODE_EXTENSIONS=$VSCODEDIR/extensions.json
+cat <<EOMextensions > "$VSCODE_EXTENSIONS"
+{
+    "recommendations": [
+        "davidanson.vscode-markdownlint",
+        "editorconfig.editorconfig",
+        "jebbs.plantuml",
+        "shd101wyy.markdown-preview-enhanced",
+        "yocto-project.yocto-bitbake",
+        "yzhang.markdown-all-in-one"
+    ]
+}
+EOMextensions
+
+echo "You had no $VSCODEDIR configuration."
+echo "These configuration files have therefore been created for you."
