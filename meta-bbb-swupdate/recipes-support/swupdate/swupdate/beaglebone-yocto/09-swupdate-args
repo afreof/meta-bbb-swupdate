@@ -1,0 +1,12 @@
+rootfs=$(swupdate -g)
+
+# Booted from SDCard --> flashing internal eMMC
+if [ "$rootfs" = "/dev/mmcblk0p2" ]; then
+  selection="-e stable,recovery"
+elif [ "$rootfs" = "/dev/mmcblk1p2" ];then
+  selection="-e stable,copy2"
+else
+  selection="-e stable,copy1"
+fi
+
+SWUPDATE_ARGS="-H beaglebone-yocto:1.0 ${selection}"

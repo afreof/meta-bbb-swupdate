@@ -1,0 +1,16 @@
+
+### Shell environment set up for builds. ###
+
+You can now run 'bitbake <target>'
+
+Common targets are:
+    core-image-minimal-swupdate
+
+You can also run generated qemu images with a command like 'runqemu serialstdio'.
+
+Other commonly useful commands are:
+ - 'devtool' and 'recipetool' handle common recipe tasks
+ - 'devtool modify' and 'devtool ide-sdk' to setup a SDK with IDE configuration
+ - 'devtool ide-sdk --mode-shared' to setup a SDK with environment file
+ - 'bitbake-layers' handles common layer tasks
+ - 'oe-pkgdata-util' handles common target package tasks
